@@ -1,0 +1,166 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, Menu, X } from 'lucide-react';
+import './styles.css';
+
+function useCountdown(eventDate){
+  const target = useMemo(()=>new Date(eventDate).getTime(),[eventDate]);
+  const [left,setLeft]=useState({d:'--',h:'--',m:'--',s:'--'});
+  useEffect(()=>{
+    const tick=()=>{
+      const diff=target-Date.now();
+      if(diff<=0){setLeft({d:'00',h:'00',m:'00',s:'00'});return;}
+      const s=Math.floor(diff/1000); setLeft({d:String(Math.floor(s/86400)).padStart(2,'0'),h:String(Math.floor(s%86400/3600)).padStart(2,'0'),m:String(Math.floor(s%3600/60)).padStart(2,'0'),s:String(s%60).padStart(2,'0')});
+    }; tick(); const id=setInterval(tick,1000); return()=>clearInterval(id);
+  },[target]);
+  return left;
+}
+
+function Nav({config}){
+ const [open,setOpen]=useState(false);
+ const go=(id)=>{document.getElementById(id)?.scrollIntoView({behavior:'smooth'});setOpen(false)};
+ return <header className="nav"><div className="nav-inner">
+   <button className="brand" onClick={()=>go('top')}>DS</button>
+   <nav className={open?'nav-links open':'nav-links'}>
+     <button onClick={()=>go('info')}>INFO</button><button onClick={()=>go('lineup')}>LINE UP</button><button onClick={()=>go('rsvp')}>RSVP</button>
+   </nav>
+   <button className="listen" onClick={()=>window.open(config.musicUrl,'_blank','noopener,noreferrer')}>ESCUCHAR <ArrowUpRight size={13}/></button>
+   <button className="menu" onClick={()=>setOpen(!open)}>{open?<X size={18}/>:<Menu size={18}/>}</button>
+ </div></header>
+}
+
+function Hero({config}){return <section id="top" className="hero" style={config.heroImage?{backgroundImage:`linear-gradient(#09090955,#090909aa),url(${config.heroImage})`,backgroundSize:'cover',backgroundPosition:'center'}:undefined}>
+ <div className="grain"/>
+ <div className="hero-top"><span>THE PARTY</span><span>{config.city}</span></div>
+ <div className="hero-copy"><div className="eyebrow">{config.tagline}</div><h1>{config.heroTitle}</h1></div>
+ <div className="hero-meta"><div><strong>{config.dateLabel.split(' ')[0]}</strong><small>{config.dateLabel.split(' ').slice(1).join(' ')}</small></div><div><strong>APERTURA</strong><small>{config.startTime}</small></div><div><strong>CIERRE</strong><small>{config.endTime}</small></div></div>
+ <button className="discover" onClick={()=>document.getElementById('info').scrollIntoView({behavior:'smooth'})}>DESCUBRIR <ArrowDown size={14}/></button>
+ <div className="ticker"><span className="pulse"/> NOW PLAYING <b>{config.musicTitle} {config.musicArtist}</b></div>
+ </section>}
+
+function Info({config}){return <section id="info" className="section info"><div className="section-index">01</div><div className="section-content"><div className="kicker">LA INVITACIÓN</div><h2>{config.infoTitle}<br/><em>{config.infoSubtitle}</em></h2><p className="lead">{config.description}</p><div className="info-grid"><div><span>CUÁNDO</span><b>{config.dateLabel}</b><small>{config.startTime}—{config.endTime}</small></div><div><span>DÓNDE</span><b>{config.location}</b><small>{config.locationNote}</small></div><div><span>FORMATO</span><b>{config.format}</b><small>{config.formatNote}</small></div></div></div></section>}
+
+function Lineup({config}){return <section id="lineup" className="section lineup"><div className="section-index">02</div><div className="section-content"><div className="kicker">EL VIAJE SONORO</div><h2>{config.lineupTitle}<br/><em>{config.lineupSubtitle}</em></h2><div className="acts">{config.artists.map((a,i)=><div className="act" key={i}><div className="act-time">{a.time}</div><div className="act-no">{String(i+1).padStart(2,'0')}</div><div><span>{a.role}</span><h3>{a.name}</h3><small>{a.genre}</small></div></div>)}</div></div></section>}
+
+function ArtistCard({artist,index}){return <article className="artist-card"><div className="artist-text"><div className="artist-kicker">ARTISTA / {String(index+1).padStart(2,'0')} · {artist.role || artist.name}</div><h2>{artist.name}</h2><div className="artist-time">{artist.time}</div><p>{artist.bio}</p><a href="#rsvp">SOLICITAR INVITACIÓN <ArrowUpRight size={14}/></a></div><div className="artist-photo">{artist.image&&<img src={artist.image} alt={`Retrato de ${artist.name}`} loading="lazy" onError={(e)=>{e.currentTarget.style.display='none';e.currentTarget.parentElement.classList.add('fallback')}}/>}<div className="photo-no">{String(index+1).padStart(2,'0')}</div></div></article>}
+function Artists({config}){return <section className="artists">{config.artists.map((artist,index)=><ArtistCard artist={artist} index={index} key={index}/>)}</section>}
+function Countdown({config}){const c=useCountdown(config.eventDate);return <section className="countdown"><div className="count-label">{config.countdownLabel}</div><div className="count-grid">{[['d','DÍAS'],['h','HORAS'],['m','MIN'],['s','SEG']].map(([k,l])=><div key={k}><strong>{c[k]}</strong><span>{l}</span></div>)}</div></section>}
+
+async function api(path, options = {}) {
+ const response = await fetch(path, { credentials:'same-origin', headers: options.body ? {'Content-Type':'application/json'} : {}, ...options });
+ const body = await response.json().catch(()=>null);
+ if (!body || typeof body !== 'object') throw new Error('La API no respondió correctamente. Iniciá el proyecto con npm run dev:full.');
+ if (!response.ok) throw Object.assign(new Error(body.error || 'Ocurrió un error.'), { status: response.status });
+ return body;
+}
+
+function RSVP({config}){
+ const [form,setForm]=useState({name:'',email:'',attending:'yes',gender:'unspecified'});
+ const [sent,setSent]=useState(false),[sentStatus,setSentStatus]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const submit=async e=>{
+   e.preventDefault(); setError(''); setBusy(true);
+   try { const result=await api('/api/rsvp',{method:'POST',body:JSON.stringify(form)}); setSentStatus(result.status);setSent(true); }
+   catch (err) { setError(err.message); }
+   finally { setBusy(false); }
+ };
+ return <section id="rsvp" className="section rsvp"><div className="section-index">03</div><div className="section-content"><div className="kicker">LISTA PRIVADA</div><h2>{config.rsvpTitle}<br/><em>{config.rsvpSubtitle}</em></h2><p className="lead">{config.rsvpDescription}</p>{sent?<div className="success"><div><Check size={24}/></div><h3>RESPUESTA RECIBIDA</h3><p>{sentStatus==='waitlist'?'El cupo está completo. Tu solicitud quedó en lista de espera.':sentStatus==='pending'?'Tu solicitud quedó pendiente de aprobación.':'Registramos que no vas a asistir.'}</p><button onClick={()=>{setSent(false);setForm({name:'',email:'',attending:'yes',gender:'unspecified'})}}>ENVIAR OTRA</button></div>:<form onSubmit={submit}><label>TU NOMBRE<input required minLength="2" maxLength="120" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Nombre y apellido"/></label><label>TU EMAIL<input required type="email" maxLength="254" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="nombre@email.com"/></label><label>¿ASISTÍS?<div className="select-wrap"><select value={form.attending} onChange={e=>setForm({...form,attending:e.target.value})}><option value="yes">SÍ, QUIERO IR</option><option value="no">NO PUEDO</option></select><ChevronDown size={15}/></div></label><label>CATEGORÍA PARA LA LISTA<div className="select-wrap"><select value={form.gender} onChange={e=>setForm({...form,gender:e.target.value})}><option value="unspecified">PREFIERO NO INDICAR</option><option value="man">HOMBRE</option><option value="woman">MUJER</option></select><ChevronDown size={15}/></div></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="submit" type="submit" disabled={busy}>{busy?'ENVIANDO…':'SOLICITAR INVITACIÓN'} <ArrowUpRight size={15}/></button><small className="privacy">Tu email se utilizará únicamente para gestionar esta invitación.</small></form>}</div></section>
+}
+
+function Footer({config}){return <footer><div className="footer-mark">DS</div><div><strong>{config.dateLabel}</strong><span>{config.startTime}—{config.endTime}</span></div><div><strong>{config.location}</strong><span>{config.city}</span></div><div className="footer-track"><span>{config.musicTitle}</span><span>{config.musicArtist}</span></div></footer>}
+
+const statusLabel = { pending:'PENDIENTE', waitlist:'EN ESPERA', confirmed:'CONFIRMADO', rejected:'RECHAZADO', not_attending:'NO ASISTE' };
+function EventEditor({config,onSaved}){
+ const [draft,setDraft]=useState(config),[busy,setBusy]=useState(false),[uploading,setUploading]=useState(-1),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ useEffect(()=>setDraft(config),[config]);
+ const update=(key,value)=>{setDraft(x=>({...x,[key]:value}));setNotice('')};
+ const artist=(index,key,value)=>setDraft(x=>({...x,artists:x.artists.map((item,i)=>i===index?{...item,[key]:value}:item)}));
+ const move=(index,to)=>setDraft(x=>{const rows=[...x.artists];[rows[index],rows[to]]=[rows[to],rows[index]];return {...x,artists:rows}});
+ const save=async()=>{setBusy(true);setError('');setNotice('');try{const result=await api('/api/admin/config',{method:'PUT',body:JSON.stringify(draft)});onSaved(result.config);setNotice('Cambios guardados. La invitación se actualizará en unos segundos.')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const upload=async(index,file)=>{
+   if(!file)return;
+   if(file.size>1_500_000){setError('La imagen debe pesar menos de 1,5 MB.');return}
+   setUploading(index);setError('');setNotice('');
+   try{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)});
+     const result=await api('/api/admin/upload',{method:'POST',body:JSON.stringify({data})});if(index===-2)update('heroImage',result.url);else artist(index,'image',result.url);setNotice('Imagen subida. Guardá los cambios del evento para publicarla.');
+   }catch(err){setError(err.message)}finally{setUploading(-1)}
+ };
+ const field=(key,label,options={})=><label className="edit-field" key={key}><span>{label}</span>{options.multiline?<textarea rows="3" value={draft[key]} onChange={e=>update(key,e.target.value)}/>:<input type={options.type||'text'} value={options.type==='datetime-local'?draft[key].slice(0,16):draft[key]} onChange={e=>update(key,options.type==='datetime-local'?e.target.value+':00-03:00':e.target.value)}/>}</label>;
+ return <div className="event-editor"><div className="admin-kicker">CONFIGURACIÓN DEL EVENTO</div><p className="editor-help">Editá los campos y presioná GUARDAR CAMBIOS. El horario del contador usa la zona horaria de Tucumán (UTC−3).</p>
+ <h2>PORTADA Y FECHA</h2><div className="editor-grid">{field('heroTitle','Título principal')}{field('tagline','Frase de portada')}{field('city','Ciudad')}{field('eventDate','Fecha y hora del contador',{type:'datetime-local'})}{field('dateLabel','Fecha visible')}{field('startTime','Hora de apertura')}{field('endTime','Hora de cierre')}{field('countdownLabel','Texto del contador')}{field('heroImage','URL de foto de portada (opcional)')}</div><div className="image-control">{draft.heroImage&&<img src={draft.heroImage} alt="Vista previa de portada"/>}<label className="upload-label">{uploading===-2?'SUBIENDO…':'SUBIR FOTO DE PORTADA (MÁX. 1,5 MB)'}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading!==-1} onChange={e=>{upload(-2,e.target.files?.[0]);e.target.value=''}}/></label></div>
+ <h2>INFORMACIÓN</h2><div className="editor-grid">{field('infoTitle','Título')}{field('infoSubtitle','Segunda línea')}{field('description','Descripción',{multiline:true})}{field('location','Ubicación visible')}{field('locationNote','Nota sobre la ubicación',{multiline:true})}{field('format','Formato')}{field('formatNote','Nota del formato',{multiline:true})}</div>
+ <h2>CUPO Y LISTA DE ESPERA</h2><p className="editor-help">0 significa sin límite. Cuando se completa el cupo, las nuevas solicitudes quedan en espera. Las confirmaciones nunca podrán superar el límite.</p><div className="editor-grid"><label className="edit-field"><span>Máximo de confirmados (0 = sin límite)</span><input type="number" min="0" max="5000" step="1" value={draft.capacity} onChange={e=>update('capacity',Number(e.target.value))}/></label></div><h2>LINE UP Y RSVP</h2><div className="editor-grid">{field('lineupTitle','Título del line up')}{field('lineupSubtitle','Segunda línea')}{field('rsvpTitle','Pregunta RSVP')}{field('rsvpSubtitle','Segunda línea RSVP')}{field('rsvpDescription','Descripción RSVP',{multiline:true})}</div>
+ <h2>MÚSICA</h2><div className="editor-grid">{field('musicTitle','Tema')}{field('musicArtist','Artista')}{field('musicUrl','URL de ESCUCHAR (https://)')}</div>
+ <h2>CORREOS A INVITADOS</h2><p className="editor-help">Al confirmar o rechazar se enviará un correo si configuraste SMTP o Resend. La ubicación privada y estos textos nunca se muestran en la landing. Usá <code>{'{nombre}'}</code>, <code>{'{evento}'}</code>, <code>{'{fecha}'}</code> y <code>{'{ubicacion}'}</code> en las plantillas.</p><label className="email-toggle"><input type="checkbox" checked={draft.sendEmails} onChange={e=>update('sendEmails',e.target.checked)}/> ENVIAR CORREOS AL CAMBIAR EL ESTADO</label><div className="editor-grid">{field('privateLocation','Dirección privada (solo en el correo)')}{field('acceptedSubject','Asunto de aceptación')}{field('acceptedBody','Mensaje de aceptación',{multiline:true})}{field('rejectedSubject','Asunto de rechazo')}{field('rejectedBody','Mensaje de rechazo',{multiline:true})}</div>
+ <h2>DJS Y SUS IMÁGENES</h2>{draft.artists.map((item,i)=><div className="editor-artist" key={i}><div className="editor-artist-head"><strong>{String(i+1).padStart(2,'0')} / {item.name||'NUEVO DJ'}</strong><span><button disabled={i===0} onClick={()=>move(i,i-1)}>↑ SUBIR</button><button disabled={i===draft.artists.length-1} onClick={()=>move(i,i+1)}>↓ BAJAR</button><button onClick={()=>setDraft(x=>({...x,artists:x.artists.filter((_,n)=>n!==i)}))}>ELIMINAR</button></span></div><div className="editor-grid">{Object.entries({name:'Nombre',role:'Rol',time:'Horario',genre:'Género',bio:'Biografía',image:'URL de imagen (https:// o ruta subida)'}).map(([key,label])=><label className="edit-field" key={key}><span>{label}</span>{key==='bio'?<textarea rows="3" value={item[key]} onChange={e=>artist(i,key,e.target.value)}/>:<input value={item[key]} onChange={e=>artist(i,key,e.target.value)}/>}</label>)}</div><div className="image-control">{item.image&&<img src={item.image} alt={`Vista previa de ${item.name}`} onError={e=>e.currentTarget.style.display='none'}/>}<label className="upload-label">{uploading===i?'SUBIENDO…':'SUBIR FOTO (JPG, PNG O WEBP · MÁX. 1,5 MB)'}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading!==-1} onChange={e=>{upload(i,e.target.files?.[0]);e.target.value=''}}/></label></div></div>)}<button className="admin-add" disabled={draft.artists.length>=12} onClick={()=>setDraft(x=>({...x,artists:[...x.artists,{name:'NUEVO DJ',role:'',time:'',genre:'',bio:'',image:''}]}))}>+ AGREGAR DJ</button>
+ {error&&<p className="form-error" role="alert">{error}</p>}{notice&&<p className="editor-notice" role="status">{notice}</p>}<div className="editor-save"><button className="admin-action" disabled={busy||uploading!==-1} onClick={save}>{busy?'GUARDANDO…':'GUARDAR CAMBIOS ↗'}</button></div></div>;
+}
+
+function AdminAccounts(){
+ const [admins,setAdmins]=useState([]),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[passwords,setPasswords]=useState({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ useEffect(()=>{api('/api/admin/admins').then(data=>setAdmins(data.admins)).catch(err=>setError(err.message))},[]);
+ const create=async e=>{e.preventDefault();setError('');setNotice('');setBusy(true);try{const result=await api('/api/admin/admins',{method:'POST',body:JSON.stringify({email,password})});setAdmins(rows=>[...rows,result.admin]);setEmail('');setPassword('');setNotice('Administrador creado. Ya puede ingresar con su email y contraseña.')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const update=async(id,changes)=>{setError('');setNotice('');setBusy(true);try{const result=await api(`/api/admin/admins/${id}`,{method:'PATCH',body:JSON.stringify(changes)});setAdmins(rows=>rows.map(a=>a.id===id?result.admin:a));setPasswords(p=>({...p,[id]:''}));setNotice(changes.password?'Contraseña actualizada. La sesión anterior quedó cerrada.':'Acceso actualizado. Las sesiones anteriores quedaron cerradas.')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ return <section className="admin-accounts"><div className="admin-kicker">ACCESOS / ADMINISTRADORES</div><h1>GESTIONAR <em>ACCESOS</em></h1><p className="editor-help">Tu cuenta propietaria se configura con ADMIN_EMAIL en el servidor. Cada cuenta nueva usa MongoDB y tiene acceso a invitados y configuración del evento. Solo la cuenta propietaria puede gestionar estos accesos.</p><form className="account-create" onSubmit={create}><label>EMAIL<input required type="email" maxLength="254" value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@ejemplo.com"/></label><label>CONTRASEÑA INICIAL<input required type="password" minLength="12" maxLength="1024" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Al menos 12 caracteres"/></label><button className="admin-action" disabled={busy}>CREAR ADMINISTRADOR ↗</button></form>{error&&<p className="form-error" role="alert">{error}</p>}{notice&&<p className="editor-notice" role="status">{notice}</p>}<div className="accounts-list">{admins.map(a=><div className="account-row" key={a.id}><div><strong>{a.email}</strong><small>{a.active?'ACTIVO':'DESACTIVADO'}</small></div><button disabled={busy} onClick={()=>update(a.id,{active:!a.active})}>{a.active?'DESACTIVAR':'ACTIVAR'}</button><form onSubmit={e=>{e.preventDefault();update(a.id,{password:passwords[a.id]})}}><input aria-label={`Nueva contraseña de ${a.email}`} type="password" required minLength="12" maxLength="1024" autoComplete="new-password" placeholder="Nueva contraseña" value={passwords[a.id]||''} onChange={e=>setPasswords(p=>({...p,[a.id]:e.target.value}))}/><button disabled={busy||!(passwords[a.id]?.length>=12)}>CAMBIAR CONTRASEÑA</button></form></div>)}</div></section>;
+}
+
+function EntryControl({rows,setRows,config,refresh}){
+ const [search,setSearch]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const confirmed=rows.filter(r=>r.status==='confirmed');
+ const arrived=confirmed.filter(r=>r.checkedInAt).length;
+ const visible=confirmed.filter(r=>`${r.name} ${r.email}`.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>!!a.checkedInAt-!!b.checkedInAt||a.name.localeCompare(b.name,'es'));
+ const check=async(r,checkedIn)=>{setBusy(true);setError('');setNotice('');try{const result=await api(`/api/admin/checkin/${r.id}`,{method:'PATCH',body:JSON.stringify({checkedIn})});setRows(rows=>rows.map(item=>item.id===r.id?result.guest:item));setNotice(checkedIn?`Ingreso registrado: ${r.name}`:`Ingreso anulado: ${r.name}`)}catch(err){setError(err.message);refresh()}finally{setBusy(false)}};
+ return <section className="entry-control"><div className="admin-kicker">CONTROL DE PUERTA / EN VIVO</div><h1>CONTROL DE <em>INGRESO</em></h1><div className="entry-summary"><div><small>INGRESARON</small><strong>{arrived}</strong></div><div><small>CONFIRMADOS</small><strong>{confirmed.length}</strong></div><div><small>FALTAN</small><strong>{confirmed.length-arrived}</strong></div><div><small>CUPO</small><strong>{config?.capacity||'∞'}</strong></div></div><p className="editor-help">Se actualiza cada 10 segundos. Solo los confirmados pueden ingresar. Usá «Anular ingreso» si marcaste a alguien por error.</p><div className="admin-tools"><input aria-label="Buscar para ingreso" placeholder="BUSCAR POR NOMBRE O EMAIL" value={search} onChange={e=>setSearch(e.target.value)}/><button onClick={refresh}>ACTUALIZAR ↻</button></div>{error&&<p className="form-error" role="alert">{error}</p>}{notice&&<p className="editor-notice" role="status">{notice}</p>}<div className="entry-list">{visible.length?visible.map(r=><div className="entry-row" key={r.id}><div><strong>{r.name}</strong><small>{r.email}</small></div><span className={r.checkedInAt?'ok':''}>{r.checkedInAt?`INGRESÓ · ${new Date(r.checkedInAt).toLocaleString('es-AR')}`:'SIN INGRESAR'}</span><button disabled={busy} onClick={()=>check(r,!r.checkedInAt)}>{r.checkedInAt?'ANULAR INGRESO':'REGISTRAR INGRESO'}</button></div>):<div className="empty">No hay confirmados que coincidan con la búsqueda.</div>}</div></section>;
+}
+
+const actionLabel={rsvp:'Nueva respuesta',status:'Estado',gender:'Categoría',checkin:'Ingreso',checkin_undo:'Ingreso anulado',event_config:'Configuración del evento',email_resend:'Reenvío de correo',admin_create:'Administrador creado',admin_update:'Administrador actualizado'};
+function Activity({rows}){
+ const [entries,setEntries]=useState([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+ const refresh=()=>{setLoading(true);api('/api/admin/audit').then(data=>{setEntries(data.entries);setError('')}).catch(err=>setError(err.message)).finally(()=>setLoading(false))};
+ useEffect(()=>{refresh()},[]);
+ return <section className="activity"><div className="admin-kicker">HISTORIAL / ÚLTIMOS 100 CAMBIOS</div><h1>ACTIVIDAD <em>RECIENTE</em></h1><button className="admin-action" onClick={refresh} disabled={loading}>ACTUALIZAR ↻</button>{error&&<p className="form-error" role="alert">{error}</p>}<div className="activity-list">{entries.map(e=>{const guest=rows.find(r=>r.id===e.guestId);return <div className="activity-row" key={e.id}><time>{new Date(e.at).toLocaleString('es-AR')}</time><strong>{actionLabel[e.action]||e.action}{guest?` · ${guest.name}`:''}</strong><span>{e.actor?.email||'Sistema'}</span><small>{e.before?.status&&`${statusLabel[e.before.status]||e.before.status} → `}{e.after?.status&&(statusLabel[e.after.status]||e.after.status)}{e.action==='checkin'&&'Ingreso registrado'}{e.action==='checkin_undo'&&'Ingreso anulado'}{e.action==='gender'&&`${e.before?.gender||'sin especificar'} → ${e.after?.gender}`}{e.action==='event_config'&&`Cupo: ${e.before?.capacity||'sin límite'} → ${e.after?.capacity||'sin límite'}`}{e.action==='admin_create'&&e.after?.email}{e.action==='admin_update'&&`${e.after?.email} · ${e.after?.active?'activo':'desactivado'}${e.after?.passwordChanged?' · contraseña actualizada':''}`}</small></div>})}{!loading&&!entries.length&&<div className="empty">Todavía no hay cambios registrados.</div>}</div></section>;
+}
+
+function Admin(){
+ const [authenticated,setAuthenticated]=useState(null),[rows,setRows]=useState([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[filter,setFilter]=useState('all'),[search,setSearch]=useState('');
+ const [credentials,setCredentials]=useState({email:'',password:''});
+ const [config,setConfig]=useState(null),[tab,setTab]=useState('guests'),[configError,setConfigError]=useState(''),[notice,setNotice]=useState('');
+ const [role,setRole]=useState(null);
+ const load=async()=>{
+   setConfigError('');setError('');
+   const [guestResult,eventResult]=await Promise.allSettled([api('/api/admin/guests'),api('/api/admin/config')]);
+   if(guestResult.status==='fulfilled')setRows(guestResult.value.guests);
+   else setError(`No se pudieron cargar los invitados: ${guestResult.reason.message}`);
+   if(eventResult.status==='fulfilled'&&eventResult.value.config)setConfig(eventResult.value.config);
+   else setConfigError(eventResult.status==='rejected'?eventResult.reason.message:'La API no envió la configuración del evento.');
+ };
+ useEffect(()=>{api('/api/admin/me').then(data=>{setRole(data.role);setAuthenticated(true);load()}).catch(()=>setAuthenticated(false));},[]);
+ const refreshGuests=()=>api('/api/admin/guests').then(data=>setRows(data.guests)).catch(()=>{});
+ useEffect(()=>{if(!authenticated||!['guests','entry'].includes(tab))return;const timer=setInterval(refreshGuests,10000);return ()=>clearInterval(timer)},[authenticated,tab]);
+ const login=async e=>{e.preventDefault();setError('');setBusy(true);try{const result=await api('/api/admin/login',{method:'POST',body:JSON.stringify(credentials)});setRole(result.role);setCredentials({email:'',password:''});setAuthenticated(true);await load()}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const logout=async()=>{try{await api('/api/admin/logout',{method:'POST'})}finally{setRole(null);setAuthenticated(false);setRows([]);setConfig(null);setTab('guests')}};
+ const change=async (id,status)=>{setError('');setNotice('');setBusy(true);try{const result=await api(`/api/admin/guests/${id}`,{method:'PATCH',body:JSON.stringify({status})});setRows(rows=>rows.map(r=>r.id===id?result.guest:r));setNotice(result.notification?.message||'Estado actualizado.')}catch(err){if(err.status===401)setAuthenticated(false);setError(err.message)}finally{setBusy(false)}};
+ const resend=async id=>{setError('');setNotice('');setBusy(true);try{const result=await api(`/api/admin/notify/${id}`,{method:'POST'});setRows(rows=>rows.map(r=>r.id===id?result.guest:r));setNotice(result.notification?.message||'Solicitud enviada.')}catch(err){setError(err.message)}finally{setBusy(false)}};
+ const changeGender=async (id,gender)=>{setError('');setBusy(true);try{const result=await api(`/api/admin/gender/${id}`,{method:'PATCH',body:JSON.stringify({gender})});setRows(rows=>rows.map(r=>r.id===id?result.guest:r))}catch(err){if(err.status===401)setAuthenticated(false);setError(err.message)}finally{setBusy(false)}};
+ const exportPdf=async()=>{
+   setError('');setBusy(true);
+   try{
+     const response=await fetch('/api/admin/export-pdf',{credentials:'same-origin'});
+     if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'No se pudo generar el PDF.');}
+     const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download='control-invitados.pdf';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+   }catch(err){setError(err.message)}finally{setBusy(false)}
+ };
+ const count=status=>rows.filter(x=>x.status===status).length;
+ const visible=rows.filter(r=>(filter==='all'||r.status===filter)&&`${r.name} ${r.email}`.toLowerCase().includes(search.toLowerCase()));
+ return <div className="admin"><div className="admin-head"><span>DS / ADMIN</span><div><a href="/">VER INVITACIÓN ↗</a>{authenticated&&<button onClick={logout}>SALIR</button>}</div></div>{authenticated===null?<div className="admin-main">CARGANDO…</div>:!authenticated?<div className="admin-main admin-login"><div className="admin-kicker">ACCESO PRIVADO</div><h1>ADMIN <em>LOGIN</em></h1><form onSubmit={login}><label>EMAIL<input type="email" autoComplete="username" required value={credentials.email} onChange={e=>setCredentials({...credentials,email:e.target.value})}/></label><label>CONTRASEÑA<input type="password" autoComplete="current-password" required value={credentials.password} onChange={e=>setCredentials({...credentials,password:e.target.value})}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="admin-action" disabled={busy}>{busy?'INGRESANDO…':'INICIAR SESIÓN ↗'}</button></form></div>:<div className="admin-main"><div className="admin-tabs"><button className={tab==='guests'?'active':''} onClick={()=>setTab('guests')}>INVITADOS</button><button className={tab==='entry'?'active':''} onClick={()=>setTab('entry')}>CONTROL DE INGRESO</button><button className={tab==='event'?'active':''} onClick={()=>setTab('event')}>CONFIGURAR EVENTO</button><button className={tab==='activity'?'active':''} onClick={()=>setTab('activity')}>HISTORIAL</button>{role==='owner'&&<button className={tab==='admins'?'active':''} onClick={()=>setTab('admins')}>ADMINISTRADORES</button>}</div>{tab==='admins'&&role==='owner'?<AdminAccounts/>:tab==='entry'?<EntryControl rows={rows} setRows={setRows} config={config} refresh={refreshGuests}/>:tab==='activity'?<Activity rows={rows}/>:tab==='event'?(config?<EventEditor config={config} onSaved={setConfig}/>:<div className="config-state">{configError?<p role="alert">No se pudo cargar la configuración: {configError}</p>:<p>Cargando configuración…</p>}<button onClick={load}>REINTENTAR ↻</button></div>):<><div className="admin-kicker">DASHBOARD / INVITADOS</div><h1>RSVP <em>OVERVIEW</em></h1><div className="stats"><div><span>TOTAL</span><b>{rows.length}</b></div><div><span>PENDIENTES</span><b>{count('pending')}</b></div><div><span>EN ESPERA</span><b>{count('waitlist')}</b></div><div><span>CONFIRMADOS</span><b>{count('confirmed')}</b></div><div><span>RECHAZADOS</span><b>{count('rejected')}</b></div><div><span>NO ASISTEN</span><b>{count('not_attending')}</b></div><div><span>INGRESARON</span><b>{rows.filter(r=>r.checkedInAt&&r.status==='confirmed').length}</b></div></div><p className="editor-help">CUPO: {config?.capacity||'SIN LÍMITE'} · Las nuevas solicitudes pasan a espera cuando el cupo está completo.</p><div className="admin-tools"><input aria-label="Buscar invitados" placeholder="BUSCAR POR NOMBRE O EMAIL" value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="Filtrar estado" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">TODOS</option>{Object.entries(statusLabel).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><button onClick={exportPdf} disabled={busy}>EXPORTAR PDF ↗</button><button onClick={load}>ACTUALIZAR ↻</button></div>{error&&<p className="form-error" role="alert">{error}</p>}{notice&&<p className="editor-notice" role="status">{notice}</p>}<div className="table"><div className="tr th"><span>NOMBRE</span><span>EMAIL</span><span>ESTADO</span><span>CATEGORÍA</span><span>FECHA</span><span>ACCIONES</span></div>{visible.length?visible.map(r=><div className="tr" key={r.id}><span data-label="Nombre">{r.name}</span><span data-label="Email">{r.email}</span><span data-label="Estado" className={r.status==='confirmed'?'ok':r.status==='rejected'?'no':''}>{statusLabel[r.status]}{r.notification?.forStatus===r.status&&<small className={r.notification.status==='sent'?'email-sent':'email-failed'}>{r.notification.status==='sent'?'EMAIL SOLICITADO':'EMAIL NO ENVIADO'}</small>}</span><span data-label="Categoría"><select aria-label={`Categoría de ${r.name}`} className="gender-select" value={r.gender||'unspecified'} disabled={busy} onChange={e=>changeGender(r.id,e.target.value)}><option value="unspecified">SIN ESPECIFICAR</option><option value="man">HOMBRE</option><option value="woman">MUJER</option></select></span><span data-label="Fecha">{new Date(r.created_at).toLocaleString('es-AR')}</span><span className="row-actions"><button disabled={busy||r.status==='confirmed'} onClick={()=>change(r.id,'confirmed')}>CONFIRMAR</button><button disabled={busy||r.status==='rejected'} onClick={()=>change(r.id,'rejected')}>RECHAZAR</button><button disabled={busy||r.status==='waitlist'} onClick={()=>change(r.id,'waitlist')}>A ESPERA</button>{['confirmed','rejected'].includes(r.status)&&<button disabled={busy} onClick={()=>resend(r.id)}>REENVIAR EMAIL</button>}</span></div>):<div className="empty">No hay invitados para mostrar.</div>}</div></>}</div>}</div>
+}
+
+function App(){
+ const [config,setConfig]=useState(null),[error,setError]=useState('');
+ useEffect(()=>{if(location.pathname.startsWith('/admin'))return;api('/api/config').then(data=>{if(!data.config)throw new Error('No llegó la configuración del evento. Revisá la API.');setConfig(data.config)}).catch(err=>setError(err.message))},[]);
+ if(location.pathname.startsWith('/admin'))return <Admin/>;
+ if(error)return <div className="site-state">No se pudo cargar el evento: {error}</div>;
+ if(!config)return <div className="site-state">CARGANDO INVITACIÓN…</div>;
+ return <><Nav config={config}/><main><Hero config={config}/><Info config={config}/><Lineup config={config}/><Artists config={config}/><Countdown config={config}/><RSVP config={config}/></main><Footer config={config}/></>;
+}
+
+createRoot(document.getElementById('root')).render(<App/>);

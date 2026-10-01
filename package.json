@@ -1,0 +1,26 @@
+{
+  "name": "juanher-lucia-birthday",
+  "private": true,
+  "version": "3.4.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "setup-admin": "node scripts/hash-password.mjs",
+    "dev:full": "node scripts/dev-server.mjs",
+    "reset-admin-local": "node scripts/reset-admin-local.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "lucide-react": "^0.468.0",
+    "mongodb": "^6.21.0",
+    "nodemailer": "^7.0.6",
+    "pdfkit": "^0.17.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.21"
+  }
+}
