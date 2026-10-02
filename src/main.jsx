@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowDown, ArrowUpRight, Check, ChevronDown, Menu, X } from 'lucide-react';
 import './styles.css';
-import { SpeedInsights } from "@vercel/speed-insights/next"
 
 function useCountdown(eventDate){
   const target = useMemo(()=>new Date(eventDate).getTime(),[eventDate]);
