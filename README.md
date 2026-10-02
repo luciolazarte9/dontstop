@@ -2,6 +2,14 @@
 
 Invitación React + Vite, API Node.js en Vercel y MongoDB para invitados, configuración e imágenes. `/admin` permite gestionar invitados y editar la página pública sin volver a desplegar.
 
+## Actualizar desde la versión 3.4.0
+
+Esta versión agrupa todas las rutas del backend en **una sola función de Vercel**, para resolver el límite de 12 funciones por deployment. Las URLs y variables de entorno siguen siendo las mismas.
+
+En tu carpeta local vinculada a GitHub, eliminá la carpeta `api` anterior antes de copiar los archivos de esta versión. La carpeta nueva `api` debe contener **solo `index.js`**; los controladores están en `server`. Conservá `.git` y tu `.env.local`. Si quedan archivos antiguos dentro de `api`, Vercel seguirá creando funciones adicionales.
+
+Después ejecutá `npm install`, `npm test` y `npm run build`; guardá los cambios con `git add .`, `git commit -m "Agrupar backend para Vercel"` y `git push`. Vercel podrá volver a desplegar el commit con las variables de entorno que ya configuraste.
+
 ## Publicar
 
 1. Descomprimí este ZIP y subí la carpeta como proyecto a Vercel mediante un repositorio Git o `npx vercel`. El framework es Vite, el comando de build `npm run build` y la salida `dist`.
@@ -36,7 +44,7 @@ Al elegir «Sí, quiero ir», la solicitud queda **pendiente** hasta que el admi
 
 ## Desarrollo y límites
 
-`npm install && npm run build` verifica el frontend. Para probar el sitio y la API en tu computadora:
+`npm install`, `npm test` y `npm run build` verifican las rutas y el frontend. Para probar el sitio y la API en tu computadora:
 
 ```bash
 cp .env.example .env.local

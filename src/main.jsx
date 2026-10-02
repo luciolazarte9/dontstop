@@ -31,7 +31,7 @@ function Nav({config}){
 
 function Hero({config}){return <section id="top" className="hero" style={config.heroImage?{backgroundImage:`linear-gradient(#09090955,#090909aa),url(${config.heroImage})`,backgroundSize:'cover',backgroundPosition:'center'}:undefined}>
  <div className="grain"/>
- <div className="hero-top"><span>THE PARTY</span><span>{config.city}</span></div>
+ <div className="hero-top"><span>NOCHE DEL AÑO</span><span>{config.city}</span></div>
  <div className="hero-copy"><div className="eyebrow">{config.tagline}</div><h1>{config.heroTitle}</h1></div>
  <div className="hero-meta"><div><strong>{config.dateLabel.split(' ')[0]}</strong><small>{config.dateLabel.split(' ').slice(1).join(' ')}</small></div><div><strong>APERTURA</strong><small>{config.startTime}</small></div><div><strong>CIERRE</strong><small>{config.endTime}</small></div></div>
  <button className="discover" onClick={()=>document.getElementById('info').scrollIntoView({behavior:'smooth'})}>DESCUBRIR <ArrowDown size={14}/></button>

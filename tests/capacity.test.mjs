@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { requestStatus, hasSpace } from '../api/_lib/capacity.js';
-import { defaults, validateConfig } from '../api/_lib/config.js';
+import { requestStatus, hasSpace } from '../server/_lib/capacity.js';
+import { defaults, validateConfig } from '../server/_lib/config.js';
 
 test('new requests enter the waitlist only after the confirmed capacity is full', () => {
   assert.equal(requestStatus(true, 5, 4), 'pending');
