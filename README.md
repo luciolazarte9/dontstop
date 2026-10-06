@@ -1,8 +1,12 @@
+<<<<<<< HEAD
 # Dont Stop · versión 3.5.0
 
 Esta actualización agrega reset con archivo, contactos con consentimiento, campañas de email y balances por fiesta y socio. Para aplicar sobre tu deploy existente, seguí [ACTUALIZAR.md](ACTUALIZAR.md).
 
 # JUANHER + LUCI — versión MongoDB
+=======
+# Dont stop — versión MongoDB
+>>>>>>> e45cc816d2060b4946064badb29702287933a3b2
 
 Invitación React + Vite, API Node.js en Vercel y MongoDB para invitados, configuración e imágenes. `/admin` permite gestionar invitados y editar la página pública sin volver a desplegar.
 
@@ -24,7 +28,7 @@ Después ejecutá `npm install`, `npm test` y `npm run build`; guardá los cambi
    | Variable | Valor |
    | --- | --- |
    | `MONGODB_URI` | La cadena de conexión completa de Atlas |
-   | `MONGODB_DB` | `juanher_luci` (opcional; este es el valor por defecto) |
+   | `MONGODB_DB` | `dontstop` (opcional; este es el valor por defecto) |
    | `ADMIN_EMAIL` | Tu email de administrador |
    | `ADMIN_PASSWORD_HASH` | El hash generado por `npm run setup-admin` |
    | `SESSION_SECRET` | El secreto generado por `npm run setup-admin` |
