@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { getConfig } from './config.js';
+import {newsletter} from '../../src/email-template.js';
 
 export function mailConfigured() {
   return !!(process.env.EMAIL_FROM && (process.env.RESEND_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD)));
@@ -46,7 +47,8 @@ export async function notifyGuest(collection, guest, eventConfig = null) {
     const subject = render(accepted ? config.acceptedSubject : config.rejectedSubject, guest, config).replace(/[\r\n]+/g,' ').trim();
     const text = render(accepted ? config.acceptedBody : config.rejectedBody, guest, config);
     if (!subject || !text.trim()) throw new Error('Configurá el asunto y el mensaje del correo en el panel.');
-    const result = await deliver(guest.email, subject, text);
+    const html = newsletter({subject,headline:subject,text,imageUrls:[]},{name:guest.name,base:process.env.APP_URL||'',notification:true});
+    const result = await deliver(guest.email, subject, text, html);
     notification = { status: 'sent', forStatus: guest.status, attemptedAt: new Date(), provider: result.provider, providerId: result.id };
   } catch (error) {
     console.error('Email notification failed:', error);
