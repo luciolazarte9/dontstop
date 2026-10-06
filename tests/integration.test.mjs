@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import express from 'express';
 import nodemailer from 'nodemailer';
@@ -25,12 +26,24 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  async function req(path,method='GET',body,customCookie=cookie){const r=await fetch(base+path,{method,headers:{Origin:base,'Content-Type':'application/json',Cookie:customCookie},...(body?{body:JSON.stringify(body)}:{})});const value=await r.json();return {status:r.status,value,cookie:r.headers.get('set-cookie')?.split(';')[0]}}
  let r=await req('/api/admin/login','POST',{email:process.env.ADMIN_EMAIL,password:'owner-password-for-test'});assert.equal(r.status,200);cookie=r.cookie;
  r=await req('/api/admin/contacts');assert.equal(r.value.total,1);assert.equal(r.value.subscribed,0);
+ async function pdf(path){const response=await fetch(base+path,{headers:{Cookie:cookie}});assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'application/pdf');const bytes=Buffer.from(await response.arrayBuffer());const result=spawnSync('pdftotext',['-','-'],{input:bytes});return result.status===0?result.stdout.toString():null;}
  const rsvp=(email,consent,attending='yes')=>req('/api/rsvp','POST',{name:'Test Person',email,attending,gender:'unspecified',marketingConsent:consent});
  assert.equal((await rsvp('owner@example.com',true)).status,201);
  assert.equal((await rsvp('sub@example.com',true)).status,201);
  assert.equal((await rsvp('other@example.com',false,'no')).status,201);
  assert.equal((await rsvp('sub@example.com',true)).status,409);
  r=await req('/api/admin/contacts');assert.equal(r.value.total,4);assert.equal(r.value.subscribed,2);
+ const applicant=await db.collection('guests').findOne({email:'sub@example.com'});
+ assert.equal(applicant.accessCategory,'general');
+ r=await req(`/api/admin/access-category/${applicant._id}`,'PATCH',{accessCategory:'vip'});assert.equal(r.status,200);assert.equal(r.value.guest.accessCategory,'vip');assert.equal(r.value.guest.gender,'unspecified');assert.equal(r.value.guest.status,'pending');
+ assert.equal((await req(`/api/admin/access-category/${applicant._id}`,'PATCH',{accessCategory:'invalid'})).status,400);
+ const oldGuest=await db.collection('guests').findOne({email:'legacy@example.com'});
+ assert.equal((await req(`/api/admin/access-category/${oldGuest._id}`,'PATCH',{accessCategory:'general_diffusion'})).status,200);
+ const allGuests=await req('/api/admin/guests');assert.equal(allGuests.value.guests.find(g=>g.email==='sub@example.com').accessCategory,'vip');
+ const vipPdf=await pdf('/api/admin/export-pdf?category=vip');if(vipPdf){assert.ok(vipPdf.includes('sub@example.com'));assert.ok(!vipPdf.includes('owner@example.com'));assert.ok(vipPdf.includes('LISTA VIP'));}
+ const diffusionPdf=await pdf('/api/admin/export-pdf?category=general_diffusion');if(diffusionPdf){assert.ok(diffusionPdf.includes('legacy@example.com'));assert.ok(!diffusionPdf.includes('sub@example.com'));}
+ const generalPdf=await pdf('/api/admin/export-pdf?category=general');if(generalPdf){assert.ok(generalPdf.includes('other@example.com'));assert.ok(!generalPdf.includes('sub@example.com'));}
+ assert.equal((await req('/api/admin/export-pdf?category=invalid')).status,400);
  // Individual partner login, no shared passwords and owner-only marketing/reset.
  r=await req('/api/admin/admins','POST',{email:'partner@example.com',password:'partner-password-for-test'});assert.equal(r.status,201);
  const login=await req('/api/admin/login','POST',{email:'partner@example.com',password:'partner-password-for-test'});assert.equal(login.status,200);const staffCookie=login.cookie;
@@ -44,6 +57,7 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  assert.equal((await req('/api/admin/production','POST',{...entry,requestId:randomUUID()},staffCookie)).status,403);
  assert.equal((await req('/api/admin/production','POST',{...entry,requestId:randomUUID(),type:'expense',category:'Living',quantity:0,amount:'50.20',status:'pending'})).status,200);
  r=await req('/api/admin/production');assert.equal(r.value.rows.length,3);assert.equal(r.value.summary.net,80085);assert.equal(r.value.summary.pendingExpense,5020);assert.equal(r.value.summary.tickets,4);
+ const financialPdf=await pdf('/api/admin/export-balance-pdf');if(financialPdf){assert.ok(financialPdf.includes('RESULTADO ACTUAL: POSITIVO'));assert.ok(financialPdf.includes('800,85'));assert.ok(financialPdf.includes('750,65'));assert.ok(financialPdf.includes('Hielo'));}
  // Prepare twice, and run parallel batches. Each subscribed contact gets one message.
  r=await req('/api/admin/campaigns','POST',{action:'draft',subject:'Hola {nombre}',text:'Próxima fiesta de Dont Stop, te esperamos.'});assert.equal(r.status,200);const campaign=r.value.id;
  await Promise.all([req('/api/admin/campaigns','POST',{action:'start',id:campaign,confirm:'ENVIAR'}),req('/api/admin/campaigns','POST',{action:'start',id:campaign,confirm:'ENVIAR'})]);
@@ -71,7 +85,7 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  const results=await Promise.all([req('/api/admin/production','POST',reset),req('/api/admin/production','POST',reset)]);assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
  assert.equal(await db.collection('guests').countDocuments(),0);assert.equal(await db.collection('guestArchive').countDocuments(),4);assert.equal(await db.collection('contacts').countDocuments(),4);assert.equal(await db.collection('rounds').countDocuments(),1);
  r=await req('/api/admin/production');assert.equal(r.value.summary.net,0);assert.equal(r.value.rows.length,0);assert.notEqual(r.value.current.roundId,current.roundId);
- const archived=await req(`/api/admin/production?round=${current.roundId}`);assert.equal(archived.value.summary.net,80085);
+ const archived=await req(`/api/admin/production?round=${current.roundId}`);assert.equal(archived.value.summary.net,80085);const archivedPdf=await pdf(`/api/admin/export-balance-pdf?round=${current.roundId}`);if(archivedPdf)assert.ok(archivedPdf.includes('CERRADO'));
  assert.equal((await req('/api/admin/production','POST',entry)).status,409);
  assert.equal((await rsvp('sub@example.com',false)).status,201);assert.equal((await db.collection('contacts').findOne({email:'sub@example.com'})).subscribed,false);
  assert.equal(await db.collection('contacts').countDocuments(),4);

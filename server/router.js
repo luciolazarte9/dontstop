@@ -13,7 +13,9 @@ import adminConfig from './admin/config.js';
 import upload from './admin/upload.js';
 import notify from './admin/notify/[id].js';
 import image from './image/[id].js';
+import exportBalancePdf from './admin/export-balance-pdf.js';
 import exportPdf from './admin/export-pdf.js';
+import accessCategory from './admin/access-category/[id].js';
 import gender from './admin/gender/[id].js';
 import admins from './admin/admins.js';
 import adminAccount from './admin/admins/[id].js';
@@ -24,12 +26,12 @@ const routes = new Map([
   ['admin/production',production], ['admin/contacts',contacts], ['admin/campaigns',campaigns], ['unsubscribe',unsubscribe], ['config', config], ['rsvp', rsvp],
   ['admin/login', login], ['admin/me', me], ['admin/logout', logout],
   ['admin/guests', guests], ['admin/config', adminConfig],
-  ['admin/upload', upload], ['admin/export-pdf', exportPdf],
+  ['admin/upload', upload], ['admin/export-balance-pdf', exportBalancePdf], ['admin/export-pdf', exportPdf],
   ['admin/admins', admins], ['admin/audit', audit]
 ]);
 const dynamicRoutes = new Map([
   ['image', image], ['admin/guests', guest], ['admin/gender', gender],
-  ['admin/notify', notify], ['admin/admins', adminAccount], ['admin/checkin', checkin]
+  ['admin/access-category', accessCategory], ['admin/notify', notify], ['admin/admins', adminAccount], ['admin/checkin', checkin]
 ]);
 
 // Both the public URL and Vercel's rewritten URL use the same dispatch table.

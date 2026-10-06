@@ -7,7 +7,7 @@ import { resolveRoute } from '../server/router.js';
 import { hashPassword } from '../server/_lib/auth.js';
 
 const id = '0123456789abcdef01234567';
-const paths = ['config', 'rsvp', 'unsubscribe', 'admin/production', 'admin/contacts', 'admin/campaigns', 'admin/login', 'admin/me', 'admin/logout', 'admin/guests', 'admin/config', 'admin/upload', 'admin/export-pdf', 'admin/admins', 'admin/audit', ...['image', 'admin/guests', 'admin/gender', 'admin/notify', 'admin/admins', 'admin/checkin'].map(p => `${p}/${id}`)];
+const paths = ['config', 'rsvp', 'unsubscribe', 'admin/production', 'admin/contacts', 'admin/campaigns', 'admin/login', 'admin/me', 'admin/logout', 'admin/guests', 'admin/config', 'admin/upload', 'admin/export-pdf', 'admin/export-balance-pdf', 'admin/admins', 'admin/audit', ...['image', 'admin/guests', 'admin/gender', 'admin/notify', 'admin/admins', 'admin/checkin','admin/access-category'].map(p => `${p}/${id}`)];
 
 test('all existing routes resolve identically before and after the Vercel rewrite', () => {
   for (const path of paths) {
@@ -45,9 +45,9 @@ test('single entry point preserves admin authorization, method checks and RSVP v
   const base = `http://127.0.0.1:${server.address().port}`;
   const request = (path, method = 'GET', body) => fetch(base + path, { method, headers: { Origin: base, 'Content-Type': 'application/json' }, ...(body && { body: JSON.stringify(body) }) });
   for (const [path, method] of [
-    ['admin/production','GET'], ['admin/contacts','GET'], ['admin/campaigns','GET'], ['admin/production','POST'], ['admin/contacts','POST'], ['admin/campaigns','POST'], ['admin/guests','GET'], ['admin/export-pdf','GET'], ['admin/audit','GET'],
+    ['admin/production','GET'], ['admin/contacts','GET'], ['admin/campaigns','GET'], ['admin/production','POST'], ['admin/contacts','POST'], ['admin/campaigns','POST'], ['admin/guests','GET'], ['admin/export-pdf','GET'], ['admin/export-balance-pdf','GET'], ['admin/audit','GET'],
     ['admin/config','GET'], ['admin/admins','GET'], ['admin/upload','POST'],
-    [`admin/checkin/${id}`,'PATCH'], [`admin/gender/${id}`,'PATCH'],
+    [`admin/checkin/${id}`,'PATCH'], [`admin/gender/${id}`,'PATCH'], [`admin/access-category/${id}`,'PATCH'],
     [`admin/guests/${id}`,'PATCH'], [`admin/admins/${id}`,'PATCH'], [`admin/notify/${id}`,'POST']
   ]) {
     assert.equal((await request(`/api/${path}`, method)).status, 401, path);

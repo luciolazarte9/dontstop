@@ -27,7 +27,7 @@ export default async function handler(req, res) {
           status = requestStatus(true, capacity, confirmed);
         } else status = requestStatus(false, 0, 0);
         const now = new Date();
-        const result = await collection.insertOne({ name: cleanName, email: cleanEmail, gender, attending: attending === 'yes', status, createdAt: now, updatedAt: now }, { session });
+        const result = await collection.insertOne({ name: cleanName, email: cleanEmail, gender, accessCategory: 'general', attending: attending === 'yes', status, createdAt: now, updatedAt: now }, { session });
         await db.collection('contacts').updateOne({email:cleanEmail}, { $set:{name:cleanName,lastSeenAt:now}, $setOnInsert:{email:cleanEmail,subscribed:false,createdAt:now} }, {upsert:true,session});
         if(req.body.marketingConsent === true) await db.collection('contacts').updateOne({email:cleanEmail}, {$set:{subscribed:true,consentedAt:now,consentSource:'rsvp-checkbox'},$unset:{unsubscribedAt:''}}, {session});
         await audit({ guestId: result.insertedId, action: 'rsvp', actor: { role: 'guest', email: cleanEmail }, after: { status, gender } }, session);
