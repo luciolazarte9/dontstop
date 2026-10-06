@@ -5,5 +5,5 @@ export const accessCategories = {
  backstage: 'Backstage'
 };
 export function accessCategoryOf(guest) {
- return Object.hasOwn(accessCategories, guest?.accessCategory) ? guest.accessCategory : 'general';
+ return typeof guest?.accessCategory === 'string' && Object.hasOwn(accessCategories, guest.accessCategory) ? guest.accessCategory : 'general';
 }

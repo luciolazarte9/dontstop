@@ -44,6 +44,16 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  const diffusionPdf=await pdf('/api/admin/export-pdf?category=general_diffusion');if(diffusionPdf){assert.ok(diffusionPdf.includes('legacy@example.com'));assert.ok(!diffusionPdf.includes('sub@example.com'));}
  const generalPdf=await pdf('/api/admin/export-pdf?category=general');if(generalPdf){assert.ok(generalPdf.includes('other@example.com'));assert.ok(!generalPdf.includes('sub@example.com'));}
  assert.equal((await req('/api/admin/export-pdf?category=invalid')).status,400);
+ for(const accessCategory of ['general','general_diffusion','vip','backstage']) {
+ const email=`choice-${accessCategory}@example.com`;
+ const choice=await req('/api/rsvp','POST',{name:'Category Choice',email,gender:'woman',attending:'yes',accessCategory});
+ assert.equal(choice.status,201);assert.equal(choice.value.accessCategory,accessCategory);assert.equal(choice.value.status,'pending');
+ assert.equal((await db.collection('guests').findOne({email})).accessCategory,accessCategory);
+ // Remove only test fixture data to keep the rest of this scenario's counts stable.
+ await db.collection('guests').deleteOne({email});await db.collection('contacts').deleteOne({email});
+ }
+ assert.equal((await req('/api/rsvp','POST',{name:'Bad Category',email:'invalid-category@example.com',gender:'man',attending:'yes',accessCategory:'unknown'})).status,400);
+ assert.equal((await req('/api/rsvp','POST',{name:'Bad Category',email:'invalid-category@example.com',gender:'man',attending:'yes',accessCategory:['vip']})).status,400);
  // Individual partner login, no shared passwords and owner-only marketing/reset.
  r=await req('/api/admin/admins','POST',{email:'partner@example.com',password:'partner-password-for-test'});assert.equal(r.status,201);
  const login=await req('/api/admin/login','POST',{email:'partner@example.com',password:'partner-password-for-test'});assert.equal(login.status,200);const staffCookie=login.cookie;

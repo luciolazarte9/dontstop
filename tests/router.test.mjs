@@ -55,6 +55,7 @@ test('single entry point preserves admin authorization, method checks and RSVP v
   }
   assert.equal((await request('/api/config', 'POST')).status, 405);
   assert.equal((await request('/api/rsvp', 'POST', { name: 'Test' })).status, 400);
+  assert.equal((await request('/api/rsvp','POST',{name:'Test Guest',email:'test@example.com',attending:'yes',gender:'man',accessCategory:['vip']})).status,400);
   assert.equal((await request('/api/admin/login', 'POST', { email: 'invalid', password: 42 })).status, 400);
   assert.equal((await request('/api/missing')).status, 404);
 });

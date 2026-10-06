@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   if (!method(req, res, 'PATCH') || !(await requireAdmin(req, res)) || !sameOrigin(req, res)) return;
   const id = String(req.query?.id || req.params?.id || '');
   const accessCategory = req.body?.accessCategory;
-  if (!/^[a-f0-9]{24}$/.test(id) || !Object.hasOwn(accessCategories, accessCategory))
+  if (!/^[a-f0-9]{24}$/.test(id) || typeof accessCategory !== 'string' || !Object.hasOwn(accessCategories, accessCategory))
     return res.status(400).json({ error: 'Invitado o categoría inválida.' });
   try {
     const collection = await guestsCollection();
