@@ -13,13 +13,13 @@ export function render(template, guest, config) {
   };
   return template.replace(/\{(nombre|evento|fecha|ubicacion)\}/g, (_, key) => variables[key]);
 }
-export async function deliver(to, subject, text) {
+export async function deliver(to, subject, text, html = null) {
   const from = process.env.EMAIL_FROM;
   if (process.env.RESEND_API_KEY) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject, text }),
+      body: JSON.stringify({ from, to: [to], subject, text, ...(html && {html}) }),
       signal: AbortSignal.timeout(12000)
     });
     const data = await response.json().catch(() => ({}));
@@ -32,7 +32,7 @@ export async function deliver(to, subject, text) {
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
     connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 12000
   });
-  const info = await transport.sendMail({ from, to, subject, text });
+  const info = await transport.sendMail({ from, to, subject, text, ...(html && {html}) });
   return { provider: 'smtp', id: info.messageId || '' };
 }
 export async function notifyGuest(collection, guest, eventConfig = null) {

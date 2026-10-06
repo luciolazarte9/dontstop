@@ -1,3 +1,4 @@
+import {newsletter} from '../../src/email-template.js';
 import { ObjectId } from 'mongodb';
 import { production, serialize } from '../_lib/production.js';
 import { mongoClient } from '../_lib/db.js';
@@ -8,7 +9,7 @@ import { fail } from '../_lib/http.js';
 import { audit, actor, ActionError } from '../_lib/audit.js';
 async function message(contact,campaign) {
  const url=`${siteUrl()}/api/unsubscribe?id=${contact._id}&token=${token(String(contact._id))}`;
- return deliver(contact.email,personalized(campaign.subject,contact).replace(/[\r\n]/g,' '),`${personalized(campaign.text,contact)}\n\nDont Stop · Para dejar de recibir novedades:\n${url}`);
+ return deliver(contact.email,personalized(campaign.subject,contact).replace(/[\r\n]/g,' '),`${personalized(campaign.text,contact)}${campaign.ctaUrl?`\n\n${campaign.ctaText}: ${campaign.ctaUrl}`:''}\n\nDont Stop · Para dejar de recibir novedades:\n${url}`,newsletter(campaign,{name:contact.name||'Hola',base:siteUrl(),unsubscribe:url}));
 }
 export default async function handler(req,res) {
  if(!['GET','POST'].includes(req.method))return res.status(405).json({error:'Método no permitido.'});
@@ -17,6 +18,12 @@ export default async function handler(req,res) {
  try {
   const db=await production(), campaigns=db.collection('campaigns'), recipients=db.collection('campaignRecipients');
   if(req.method==='GET') {
+   if(req.query.campaignId) {
+    if(!/^[a-f0-9]{24}$/.test(req.query.campaignId))throw new ActionError(400,'Campaña inválida.');
+    const campaignId=new ObjectId(req.query.campaignId),page=Math.max(0,Math.floor(Number(req.query.page)||0));
+    const rows=await recipients.aggregate([{$match:{campaignId}},{$sort:{_id:1}},{$skip:page*50},{$limit:50},{$lookup:{from:'contacts',localField:'contactId',foreignField:'_id',as:'contact'}},{$project:{state:1,error:1,sentAt:1,claimedAt:1,email:{$arrayElemAt:['$contact.email',0]},name:{$arrayElemAt:['$contact.name',0]}}}]).toArray();
+    return res.json({recipients:rows.map(serialize),total:await recipients.countDocuments({campaignId}),page});
+   }
    const docs=await campaigns.find().sort({createdAt:-1}).limit(30).toArray();
    const results=[];
    for(const doc of docs) {
@@ -26,7 +33,7 @@ export default async function handler(req,res) {
    }
    let configured=false, configurationError='';
    try{siteUrl();configured=mailConfigured();if(!configured)configurationError='Configurá EMAIL_FROM y SMTP o Resend.';}catch(e){configurationError=e.message}
-   return res.json({campaigns:results,configured,configurationError});
+   return res.json({campaigns:results,configured,configurationError,subscribed:await db.collection('contacts').countDocuments({subscribed:true})});
   }
   const body=req.body||{}, action=body.action;
   if(action==='draft'||action==='test') {
@@ -36,7 +43,7 @@ export default async function handler(req,res) {
     // A preview only goes to the authenticated owner, never an arbitrary address.
     const contact=await db.collection('contacts').findOne({email:req.admin.email.toLowerCase()});
     if(!contact)throw new ActionError(400,'Registrá una invitación con tu email de administrador para habilitar la prueba.');
-    await message(contact,{...data,subject:`[PRUEBA] ${data.subject}`});
+    await message({...contact,email:req.admin.email.trim().toLowerCase()},{...data,subject:`[PRUEBA] ${data.subject}`});
     return res.json({message:'Prueba solicitada al proveedor para tu email de administrador.'});
    }
    const result=await campaigns.insertOne({...data,status:'draft',createdAt:new Date(),actor:actor(req)});
@@ -54,11 +61,11 @@ export default async function handler(req,res) {
     const contacts=await db.collection('contacts').find({subscribed:true},{session,projection:{_id:1}}).toArray();
     if(!contacts.length)throw new ActionError(400,'No hay contactos con consentimiento.');
     if(contacts.length>10000)throw new ActionError(400,'Esta versión admite hasta 10.000 destinatarios por campaña.');
-    await campaigns.updateOne({_id:id,status:'draft'},{$set:{status:'queued',startedAt:new Date()}},{session});
+    await campaigns.updateOne({_id:id,status:'draft'},{$set:{status:'queued',targetCount:contacts.length,startedAt:new Date()}},{session});
     await recipients.insertMany(contacts.map(c=>({campaignId:id,contactId:c._id,state:'pending'})),{session});
     await audit({action:'campaign_start',actor:actor(req),after:{id:body.id,recipients:contacts.length}},session);
    })}finally{await session.endSession()}
-   return res.json({message:'Campaña preparada. Continuá el envío por tandas.'});
+   return res.json({message:'Envío real preparado para todos los contactos suscriptos.'});
   }
   if(action==='retry') {
    if(body.confirm!=='REINTENTAR'||!/^[a-f0-9]{24}$/.test(body.recipientId||''))throw new ActionError(400,'Confirmá el reintento individual.');

@@ -69,10 +69,11 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  r=await req('/api/admin/production');assert.equal(r.value.rows.length,3);assert.equal(r.value.summary.net,80085);assert.equal(r.value.summary.pendingExpense,5020);assert.equal(r.value.summary.tickets,4);
  const financialPdf=await pdf('/api/admin/export-balance-pdf');if(financialPdf){assert.ok(financialPdf.includes('RESULTADO ACTUAL: POSITIVO'));assert.ok(financialPdf.includes('800,85'));assert.ok(financialPdf.includes('750,65'));assert.ok(financialPdf.includes('Hielo'));}
  // Prepare twice, and run parallel batches. Each subscribed contact gets one message.
- r=await req('/api/admin/campaigns','POST',{action:'draft',subject:'Hola {nombre}',text:'Próxima fiesta de Dont Stop, te esperamos.'});assert.equal(r.status,200);const campaign=r.value.id;
+ r=await req('/api/admin/campaigns','POST',{action:'draft',subject:'Hola {nombre}',headline:'Nueva noche, {nombre}',text:'Próxima fiesta de Dont Stop, te esperamos.',ctaText:'Ver evento',ctaUrl:'https://example.com/event',imageUrls:[]});assert.equal(r.status,200);const campaign=r.value.id;
  await Promise.all([req('/api/admin/campaigns','POST',{action:'start',id:campaign,confirm:'ENVIAR'}),req('/api/admin/campaigns','POST',{action:'start',id:campaign,confirm:'ENVIAR'})]);
  await Promise.all([req('/api/admin/campaigns','POST',{action:'batch',id:campaign}),req('/api/admin/campaigns','POST',{action:'batch',id:campaign}),req('/api/admin/campaigns','POST',{action:'batch',id:campaign})]);
- assert.equal(sent.length,2);assert.deepEqual(sent.map(m=>m.to).sort(),['owner@example.com','sub@example.com']);
+ assert.equal(sent.length,2);assert.ok(sent.every(m=>m.html.includes('Dar de baja')&&m.html.includes('Ver evento')&&!m.subject.includes('[PRUEBA]')));assert.deepEqual(sent.map(m=>m.to).sort(),['owner@example.com','sub@example.com']);
+ const audience=await req(`/api/admin/campaigns?campaignId=${campaign}`);assert.equal(audience.value.total,2);assert.ok(audience.value.recipients.every(r=>r.state==='sent'));
  const url=sent.find(m=>m.to==='sub@example.com').text.match(/http:\/\/[^\s]+/)[0];
  assert.equal((await fetch(url)).status,200);assert.equal((await db.collection('contacts').findOne({email:'sub@example.com'})).subscribed,true);
  assert.equal((await fetch(url,{method:'POST'})).status,200);assert.equal((await db.collection('contacts').findOne({email:'sub@example.com'})).subscribed,false);
@@ -90,6 +91,7 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  assert.equal((await req('/api/admin/campaigns','POST',{action:'retry',id:third,recipientId:issue.id,confirm:'REINTENTAR'})).status,200);
  await req('/api/admin/campaigns','POST',{action:'batch',id:third});assert.equal(sent.length,3);
  assert.equal((await req('/api/admin/campaigns','POST',{action:'retry',id:third,recipientId:issue.id,confirm:'REINTENTAR'})).status,409);
+ const testCopy=await req('/api/admin/campaigns','POST',{action:'test',subject:'Only preview',text:'This is a test copy.',headline:'Elegant test'});assert.equal(testCopy.status,200);assert.equal(sent.at(-1).to,'owner@example.com');assert.ok(sent.at(-1).subject.startsWith('[PRUEBA]'));assert.ok(sent.at(-1).html.includes('Elegant test'));
  // Racing reset clicks cannot close two rounds or lose the archive.
  const reset={action:'reset',confirm:'RESETEAR',roundId:current.roundId};
  const results=await Promise.all([req('/api/admin/production','POST',reset),req('/api/admin/production','POST',reset)]);assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
@@ -99,4 +101,17 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  assert.equal((await req('/api/admin/production','POST',entry)).status,409);
  assert.equal((await rsvp('sub@example.com',false)).status,201);assert.equal((await db.collection('contacts').findOne({email:'sub@example.com'})).subscribed,false);
  assert.equal(await db.collection('contacts').countDocuments(),4);
+ // Import previews never write; repeated imports cannot duplicate or reverse a prior unsubscribe.
+ const csv='email,nombre\nimported@example.com,Nuevo Contacto\nsub@example.com,Existing\nIMPORTED@example.com,Duplicate\ninvalid,Bad';
+ const beforeImport=await db.collection('contacts').countDocuments();
+ r=await req('/api/admin/contacts','POST',{action:'preview-import',csv});assert.equal(r.status,200);assert.equal(r.value.summary.valid,2);assert.equal(r.value.summary.duplicates,1);assert.equal(r.value.summary.invalid,1);assert.equal(r.value.summary.excluded,1);assert.equal(await db.collection('contacts').countDocuments(),beforeImport);
+ assert.equal((await req('/api/admin/contacts','POST',{action:'import',csv,consent:true})).status,400);
+ assert.equal((await req('/api/admin/contacts','POST',{action:'import',csv,confirm:'IMPORTAR',consent:true},staffCookie)).status,403);
+ for(let i=0;i<2;i++)assert.equal((await req('/api/admin/contacts','POST',{action:'import',csv,confirm:'IMPORTAR',consent:true})).status,200);
+ assert.equal(await db.collection('contacts').countDocuments(),beforeImport+1);
+ assert.equal((await db.collection('contacts').findOne({email:'imported@example.com'})).subscribed,true);
+ assert.equal((await db.collection('contacts').findOne({email:'sub@example.com'})).subscribed,false);
+ assert.equal((await req('/api/admin/contacts','POST',{action:'import',csv:'unconsented@example.com',confirm:'IMPORTAR',consent:false})).status,200);
+ assert.equal((await db.collection('contacts').findOne({email:'unconsented@example.com'})).subscribed,false);
+
 });
