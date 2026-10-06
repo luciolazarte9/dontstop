@@ -44,7 +44,7 @@ export async function requireAdmin(req, res, ownerOnly = false) {
   try {
     req.admin = await authorized(req);
     if (!req.admin) { res.status(401).json({ error: 'Iniciá sesión para continuar.' }); return false; }
-    if (ownerOnly && req.admin.role !== 'owner') { res.status(403).json({ error: 'Solo la cuenta propietaria puede gestionar administradores.' }); return false; }
+    if (ownerOnly && req.admin.role !== 'owner') { res.status(403).json({ error: 'Esta acción requiere la cuenta propietaria.' }); return false; }
     return true;
   } catch (error) { console.error(error); res.status(500).json({ error: 'No se pudo verificar la sesión.' }); return false; }
 }

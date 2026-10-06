@@ -1,3 +1,7 @@
+import production from './admin/production.js';
+import contacts from './admin/contacts.js';
+import campaigns from './admin/campaigns.js';
+import unsubscribe from './unsubscribe.js';
 import config from './config.js';
 import rsvp from './rsvp.js';
 import login from './admin/login.js';
@@ -17,7 +21,7 @@ import checkin from './admin/checkin/[id].js';
 import audit from './admin/audit.js';
 
 const routes = new Map([
-  ['config', config], ['rsvp', rsvp],
+  ['admin/production',production], ['admin/contacts',contacts], ['admin/campaigns',campaigns], ['unsubscribe',unsubscribe], ['config', config], ['rsvp', rsvp],
   ['admin/login', login], ['admin/me', me], ['admin/logout', logout],
   ['admin/guests', guests], ['admin/config', adminConfig],
   ['admin/upload', upload], ['admin/export-pdf', exportPdf],

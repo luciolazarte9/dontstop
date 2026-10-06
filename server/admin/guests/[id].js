@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     if (!changed) return res.status(200).json({ guest: serialize(doc), notification: { sent: false, message: 'El estado no cambió; no se envió otro correo.' } });
     const notification = ['confirmed','rejected'].includes(status) ? await notifyGuest(collection, doc) : { sent: false, message: 'Estado actualizado.' };
     const updated = await collection.findOne({ _id: doc._id });
+    if (!updated) return res.status(409).json({error:"La lista se reseteó. Actualizá el panel."});
     return res.status(200).json({ guest: serialize(updated), notification });
   } catch (error) { return error instanceof ActionError ? res.status(error.status).json({ error: error.message }) : fail(res, error); }
 }

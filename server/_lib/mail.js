@@ -13,7 +13,7 @@ export function render(template, guest, config) {
   };
   return template.replace(/\{(nombre|evento|fecha|ubicacion)\}/g, (_, key) => variables[key]);
 }
-async function deliver(to, subject, text) {
+export async function deliver(to, subject, text) {
   const from = process.env.EMAIL_FROM;
   if (process.env.RESEND_API_KEY) {
     const response = await fetch('https://api.resend.com/emails', {
