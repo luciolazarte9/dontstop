@@ -7,7 +7,7 @@ import { resolveRoute } from '../server/router.js';
 import { hashPassword } from '../server/_lib/auth.js';
 
 const id = '0123456789abcdef01234567';
-const paths = ['config', 'rsvp', 'unsubscribe', 'admin/production', 'admin/contacts', 'admin/campaigns', 'admin/login', 'admin/me', 'admin/logout', 'admin/guests', 'admin/config', 'admin/upload', 'admin/export-pdf', 'admin/export-balance-pdf', 'admin/admins', 'admin/audit', ...['image', 'admin/guests', 'admin/gender', 'admin/notify', 'admin/admins', 'admin/checkin','admin/access-category'].map(p => `${p}/${id}`)];
+const paths = ['subscribe','config', 'rsvp', 'unsubscribe', 'admin/production', 'admin/contacts', 'admin/campaigns', 'admin/login', 'admin/me', 'admin/logout', 'admin/guests', 'admin/config', 'admin/upload', 'admin/export-pdf', 'admin/export-balance-pdf', 'admin/admins', 'admin/audit', ...['image', 'admin/guests', 'admin/gender', 'admin/notify', 'admin/admins', 'admin/checkin','admin/access-category'].map(p => `${p}/${id}`)];
 
 test('all existing routes resolve identically before and after the Vercel rewrite', () => {
   for (const path of paths) {

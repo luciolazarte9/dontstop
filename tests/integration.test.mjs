@@ -114,4 +114,18 @@ test('isolated MongoDB: migration, consent, campaigns, partners, balances and at
  assert.equal((await req('/api/admin/contacts','POST',{action:'import',csv:'unconsented@example.com',confirm:'IMPORTAR',consent:false})).status,200);
  assert.equal((await db.collection('contacts').findOne({email:'unconsented@example.com'})).subscribed,false);
 
+ // TBA closes RSVP without losing old data; subscription is separate from the guest list.
+ await db.collection('settings').updateOne({_id:'event'},{$set:{'config.eventAnnounced':false}},{upsert:true});
+ assert.equal((await rsvp('closed@example.com',true)).status,409);
+ const guestsBefore=await db.collection('guests').countDocuments();
+ assert.equal((await req('/api/subscribe','POST',{email:'tba@example.com',name:'TBA Subscriber',marketingConsent:false})).status,400);
+ for(let i=0;i<2;i++)assert.equal((await req('/api/subscribe','POST',{email:'TBA@example.com',name:'TBA Subscriber',marketingConsent:true})).status,200);
+ assert.equal(await db.collection('contacts').countDocuments({email:'tba@example.com'}),1);
+ assert.equal((await db.collection('contacts').findOne({email:'tba@example.com'})).subscribed,true);
+ assert.equal(await db.collection('guests').countDocuments(),guestsBefore);
+ assert.equal((await req('/api/subscribe','POST',{email:'sub@example.com',marketingConsent:true})).status,200);
+ assert.equal((await db.collection('contacts').findOne({email:'sub@example.com'})).subscribed,false);
+ await db.collection('settings').updateOne({_id:'event'},{$set:{'config.eventAnnounced':true}});
+ assert.equal((await rsvp('reopened@example.com',false)).status,201);
+
 });

@@ -22,8 +22,9 @@ export default async function handler(req, res) {
     try {
       await session.withTransaction(async () => {
         await lock(db, session);
+        const event = await db.collection('settings').findOne({ _id: 'event' }, { session });
+        if(event?.config?.eventAnnounced===false){const error=new Error('Todavía no hay un evento anunciado. Suscribite para recibir novedades.');error.status=409;throw error}
         if (attending === 'yes') {
-          const event = await db.collection('settings').findOne({ _id: 'event' }, { session });
           const capacity = event?.config?.capacity || 0;
           const confirmed = capacity ? await collection.countDocuments({ status: 'confirmed' }, { session }) : 0;
           status = requestStatus(true, capacity, confirmed);
@@ -37,6 +38,7 @@ export default async function handler(req, res) {
     } finally { await session.endSession(); }
     return res.status(201).json({ message: 'Respuesta recibida.', status, accessCategory });
   } catch (error) {
+    if(error.status===409)return res.status(409).json({error:error.message});
     if (error.code === 11000) return res.status(409).json({ error: 'Ese email ya registró una respuesta. Contactá a los organizadores si necesitás cambiarla.' });
     return fail(res, error);
   }

@@ -1,5 +1,6 @@
 import { database } from './db.js';
 export const defaults = {
+  eventAnnounced: true, musicAudioUrl: '', musicAutoplay: true,
   heroTitle: 'JUANHER+LUCI', heroImage: '', tagline: 'UNA TARDE · UNA NOCHE · UNA HISTORIA', city: 'TUCUMÁN · ARG',
   eventDate: '2026-09-26T17:00:00-03:00', dateLabel: '26 SEP 2026', startTime: '17:00', endTime: '01:00',
   infoTitle: 'El cielo cambia.', infoSubtitle: 'Nosotros seguimos.',
@@ -25,7 +26,7 @@ export const defaults = {
 };
 export const privateFields = ['sendEmails','privateLocation','acceptedSubject','acceptedBody','rejectedSubject','rejectedBody'];
 export function publicConfig(config) { const copy = { ...config }; for (const field of privateFields) delete copy[field]; return copy; }
-const fields = Object.fromEntries(Object.entries(defaults).filter(([key]) => !['artists','sendEmails','capacity'].includes(key)).map(([key]) => [key, key === 'description' || key.endsWith('Body') ? 3000 : key.endsWith('Note') || key === 'rsvpDescription' || key === 'privateLocation' ? 500 : 240]));
+const fields = Object.fromEntries(Object.entries(defaults).filter(([key]) => !['artists','sendEmails','capacity','eventAnnounced','musicAutoplay','musicAudioUrl'].includes(key)).map(([key]) => [key, key === 'description' || key.endsWith('Body') ? 3000 : key.endsWith('Note') || key === 'rsvpDescription' || key === 'privateLocation' ? 500 : 240]));
 function imageUrl(value) {
   if (value === '') return true;
   if (/^\/api\/image\/[a-f0-9]{24}$/.test(value)) return true;
@@ -38,6 +39,15 @@ export function validateConfig(input) {
     const value = input[key];
     if (typeof value !== 'string' || value.length > max) return null;
     output[key] = value.trim();
+  }
+  output.eventAnnounced=input.eventAnnounced??true;
+  output.musicAutoplay=input.musicAutoplay??true;
+  output.musicAudioUrl=input.musicAudioUrl??'';
+  if(typeof output.eventAnnounced!=='boolean'||typeof output.musicAutoplay!=='boolean'||typeof output.musicAudioUrl!=='string'||output.musicAudioUrl.length>1500)return null;
+  if(output.musicAudioUrl){
+    if(!/^\/music\/[a-z0-9_/-]+\.(mp3|wav|ogg|m4a)$/i.test(output.musicAudioUrl)){
+      try{const url=new URL(output.musicAudioUrl);if(url.protocol!=='https:'||url.username||url.password||! /\.(mp3|wav|ogg|m4a)$/i.test(url.pathname))return null}catch{return null}
+    }
   }
   if (typeof input.sendEmails !== 'boolean') return null;
   output.sendEmails = input.sendEmails;
